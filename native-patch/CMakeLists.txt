@@ -2813,6 +2813,9 @@ cocos_source_files(
   yasio/yasio/bindings/yasio_jsb20.cpp 
   yasio/yasio/bindings/yasio_jsb20.hpp
   yasio/kcp/ikcp.c)
+if (MSVC_IDE)
+    cocos_source_files(yasio/yasio/yasio.natvis)
+endif()
 list(APPEND CC_EXTERNAL_INCLUDES ${CWD}/yasio)
 
 ### generate source files
