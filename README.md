@@ -1,7 +1,7 @@
 # yasio-creator-test
 
-cocos creator version: 3.7.3
-yasio version: 4.1.0
+- cocos creator version: 3.7.3
+- yasio version: 4.1.0
 
 usage: 
 
