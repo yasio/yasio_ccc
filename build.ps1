@@ -137,6 +137,20 @@ if ((Test-Path $simulatorLinkDest -PathType Container)) {
 
 New-Item -Path $simulatorLinkDest -ItemType Junction -Value $simulatorDist
 
+# ------ link source engine native simulator
+Write-Host "Linking source dir"
+$simulatorLinkDest = Join-Path $sourceEngineRoot 'native/simulator/Release'
+if (Test-Path $simulatorLinkDest -PathType Container) {
+    $simulatorBak = "${simulatorLinkDest}-bak"
+    if (Test-Path $simulatorBak -PathType Container) {
+        Remove-Item -Path $simulatorLinkDest -Recurse -Force
+    }
+    else {
+        Move-Item $simulatorLinkDest $simulatorBak
+    }
+}
+New-Item -Path $simulatorLinkDest -ItemType Junction -Value $simulatorDist
+
 # 
 Write-Host "build simulator done, you can locate native engine to: $nativeDir in cocos creator editor"
 Pause
