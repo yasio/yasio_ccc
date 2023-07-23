@@ -5,4 +5,4 @@
 
 usage: 
 
-1. double click build.ps1 will auto build custom simulator
+1. double click build.ps1 will auto build custom simulator in folder `simulator/Release` and auto redirect engine sumulator to it by symlink, backup folder will created for engine original simulator
