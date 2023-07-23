@@ -5,5 +5,4 @@
 
 usage: 
 
-1. copy native-overwrite/* to path/to/editors/Creator/3.7.3/resources/resources/3d/engine/native/
-2. build simulator by cmake, glue not work
+1. double click build.ps1 will auto build custom simulator
