@@ -1,4 +1,4 @@
-# This build script only test for 3.7.3
+# This build script only test for 3.8.2
 
 $optimize_flag = "Debug"
 
@@ -102,8 +102,20 @@ if (!(Test-Path $simulatorReleaseDir)) {
 }
 
 # patch
-$patch = Join-Path $myRoot 'native-patch\*'
+$patch_dir = Join-Path $myRoot 'native-patch'
+
+$patch = Join-Path $patch_dir '*'
 Copy-Item -Path $patch -Destination "$nativeDir" -Recurse -Force
+if(!(Test-Path (Join-Path $nativeDir '.git') -PathType Container)) {
+    mkdirs (Join-Path $nativeDir '.git/objects')
+    mkdirs (Join-Path $nativeDir '.git/refs')
+    Write-Output "ref: refs/heads/master" >(Join-Path $nativeDir '.git/HEAD')
+}
+$patches = Get-ChildItem $patch_dir -Filter '*.patch'
+foreach($patch_file in $patches) {
+    echo "apply patch: $patch_file"
+    git -C $nativeDir apply --verbose $patch_file.FullName
+}
 
 # build
 Set-Location $simulatorDir

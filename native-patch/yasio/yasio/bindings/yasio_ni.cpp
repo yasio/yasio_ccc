@@ -5,7 +5,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2012-2023 HALX99
+Copyright (c) 2012-2024 HALX99
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,6 +32,7 @@ SOFTWARE.
 #include <array>
 #include <string.h>
 #include "yasio/yasio.hpp"
+#include "yasio/split.hpp"
 
 #if defined(_WINDLL)
 #  define YASIO_NI_API __declspec(dllexport)
@@ -45,25 +46,6 @@ using namespace yasio;
 
 namespace
 {
-template <typename _CStr, typename _Fn>
-inline void fast_split(_CStr s, size_t slen, typename std::remove_pointer<_CStr>::type delim, _Fn func)
-{
-  auto _Start = s; // the start of every string
-  auto _Ptr   = s; // source string iterator
-  auto _End   = s + slen;
-  while ((_Ptr = strchr(_Ptr, delim)))
-  {
-    if (_Start < _Ptr)
-      if (func(_Start, _Ptr))
-        return;
-    _Start = _Ptr + 1;
-    ++_Ptr;
-  }
-  if (_Start < _End)
-  {
-    func(_Start, _End);
-  }
-}
 inline int svtoi(cxx17::string_view& sv) { return !sv.empty() ? atoi(sv.data()) : 0; }
 inline const char* svtoa(cxx17::string_view& sv) { return !sv.empty() ? sv.data() : ""; }
 } // namespace
@@ -77,21 +59,32 @@ YASIO_NI_API void yasio_init_globals(void(YASIO_INTEROP_DECL* pfn)(int level, co
 }
 YASIO_NI_API void yasio_cleanup_globals() { io_service::cleanup_globals(); }
 
-struct yasio_event_data {
-    int kind;
-    int status;
-    int channel;
-    void* session; // transport
-    void* packet;
-    void* user; // event source
+struct yasio_io_event {
+  int kind; // event kind
+  int channel; // channel index
+  void* thandle; // transport
+  union {
+    void* hmsg; // io_packet*
+    int ec; // error code
+  };
+  void* user; // user data
 };
-YASIO_NI_API void* yasio_create_service(int channel_count, void(YASIO_INTEROP_DECL* event_cb)(yasio_event_data* event), void* user)
+
+YASIO_NI_API void* yasio_create_service(int channel_count, void(YASIO_INTEROP_DECL* event_cb)(yasio_io_event* event), void* user)
 {
   assert(!!event_cb);
   io_service* service = new io_service(channel_count);
   service->start([=](event_ptr e) {
     auto& pkt = e->packet();
-    yasio_event_data event{e->kind(), e->status(), e->cindex(), e->transport(), !is_packet_empty(pkt) ? &pkt : nullptr, user};
+    yasio_io_event event;
+    event.kind    = e->kind();
+    event.channel = e->cindex();
+    event.thandle = e->transport();
+    event.user    = user;
+    if (event.kind == yasio::YEK_ON_PACKET)
+      event.hmsg = !is_packet_empty(pkt) ? &pkt : nullptr;
+    else
+      event.ec = e->status();
     event_cb(&event);
   });
   return service;
@@ -143,7 +136,7 @@ YASIO_NI_API void yasio_set_resolv_fn(void* service_ptr, int(YASIO_INTEROP_DECL*
 YASIO_NI_API void yasio_set_option(void* service_ptr, int opt, const char* pszArgs)
 {
   auto service = reinterpret_cast<io_service*>(service_ptr);
-  if (!service)
+  if (!service || !pszArgs || !*pszArgs)
     return;
 
   // process one arg
@@ -163,10 +156,14 @@ YASIO_NI_API void yasio_set_option(void* service_ptr, int opt, const char* pszAr
   std::string strArgs = pszArgs;
   std::array<cxx17::string_view, YASIO_MAX_OPTION_ARGC> args;
   int argc = 0;
-  fast_split(&strArgs.front(), strArgs.length(), ';', [&](char* s, char* e) {
-    *e         = '\0'; // to c style string
-    args[argc] = cxx17::string_view(s, e - s);
-    return (++argc == YASIO_MAX_OPTION_ARGC);
+  yasio::split_if(&strArgs.front(), ';', [&](char* s, char* e) {
+    if (e) {
+        *e           = '\0'; // to c style string
+        args[argc++] = cxx17::string_view(s, e - s);
+    } else {
+        args[argc++] = cxx17::string_view{s};
+    }
+    return (argc < YASIO_MAX_OPTION_ARGC);
   });
 
   switch (opt)
@@ -232,22 +229,24 @@ YASIO_NI_API void yasio_close_handle(void* service_ptr, void* thandle)
   if (service)
     service->close(reinterpret_cast<transport_handle_t>(thandle));
 }
-YASIO_NI_API int yasio_write(void* service_ptr, void* thandle, const unsigned char* bytes, int len)
+YASIO_NI_API int yasio_write(void* service_ptr, void* thandle, const char* bytes, int len)
 {
   auto service = reinterpret_cast<io_service*>(service_ptr);
   if (service)
-    return service->write(reinterpret_cast<transport_handle_t>(thandle), yasio::sbyte_buffer(bytes, bytes + len, std::true_type{}));
+    return service->write(reinterpret_cast<transport_handle_t>(thandle), yasio::sbyte_buffer(bytes, bytes + len));
   return -1;
 }
-YASIO_NI_API int yasio_forward(void* service_ptr, void* thandle, void* bufferHandle, const unsigned char*(YASIO_INTEROP_DECL* pfnLockBuffer)(void* bufferHandle, int* bufferDataLen), void(YASIO_INTEROP_DECL* pfnUnlockBuffer)(void* bufferHandle))
+YASIO_NI_API int yasio_forward(void* service_ptr, void* thandle, void* bufferHandle,
+                               const char*(YASIO_INTEROP_DECL* pfnLockBuffer)(void* bufferHandle, int* bufferDataLen),
+                               void(YASIO_INTEROP_DECL* pfnUnlockBuffer)(void* bufferHandle))
 {
   auto service = reinterpret_cast<io_service*>(service_ptr);
-  if (service) {
-    int len = 0;
+  if (service)
+  {
+    int len    = 0;
     auto bytes = pfnLockBuffer(bufferHandle, &len);
-    return service->forward(reinterpret_cast<transport_handle_t>(thandle), bytes, len, [bufferHandle,pfnUnlockBuffer](int,size_t){
-      pfnUnlockBuffer(bufferHandle);
-    });
+    return service->forward(reinterpret_cast<transport_handle_t>(thandle), bytes, len,
+                            [bufferHandle, pfnUnlockBuffer](int, size_t) { pfnUnlockBuffer(bufferHandle); });
   }
   return -1;
 }

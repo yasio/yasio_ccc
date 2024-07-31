@@ -25,31 +25,33 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef YASIO__LOGGING_HPP
-#define YASIO__LOGGING_HPP
-#include "yasio/strfmt.hpp"
 
-#if defined(__EMSCRIPTEN__)
-#  include <stdio.h>
-#  include <unistd.h>
-inline void yasio__print(std::string&& message) { ::write(::fileno(stdout), message.c_str(), message.size()); }
-#  define YASIO_LOG_TAG(tag, format, ...) yasio__print(::yasio::strfmt(127, (tag format), ##__VA_ARGS__))
-#elif defined(_WIN32)
-#  define YASIO_LOG_TAG(tag, format, ...) OutputDebugStringA(::yasio::strfmt(127, (tag format "\n"), ##__VA_ARGS__).c_str())
-#elif defined(ANDROID) || defined(__ANDROID__)
-#  include <android/log.h>
-#  include <jni.h>
-#  define YASIO_LOG_TAG(tag, format, ...) __android_log_print(ANDROID_LOG_INFO, "yasio", (tag format), ##__VA_ARGS__)
-#else
-#  define YASIO_LOG_TAG(tag, format, ...) printf((tag format "\n"), ##__VA_ARGS__)
-#endif
+#pragma once
 
-#define YASIO_LOG(format, ...) YASIO_LOG_TAG("[yasio]", format, ##__VA_ARGS__)
+#include "yasio/string.hpp"
+#include "yasio/string_view.hpp"
+#include <fstream>
 
-#if !defined(YASIO_VERBOSE_LOG)
-#  define YASIO_LOGV(fmt, ...) (void)0
-#else
-#  define YASIO_LOGV YASIO_LOG
-#endif
-
-#endif
+namespace yasio
+{
+inline yasio::string read_text_file(cxx17::string_view file_path)
+{
+  std::ifstream fin(file_path.data(), std::ios_base::binary);
+  if (fin.is_open())
+  {
+    fin.seekg(std::ios_base::end);
+    auto n = static_cast<size_t>(fin.tellg());
+    if (n > 0)
+    {
+      yasio::string ret;
+      ret.resize_and_overwrite(n, [&fin](char* out, size_t outlen) {
+        fin.seekg(std::ios_base::beg);
+        fin.read(out, outlen);
+        return outlen;
+      });
+      return ret;
+    }
+  }
+  return yasio::string{};
+}
+} // namespace yasio

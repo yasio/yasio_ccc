@@ -5,7 +5,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2012-2023 HALX99
+Copyright (c) 2012-2024 HALX99
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -50,8 +50,6 @@ SOFTWARE.
 #include <mutex>
 #include <atomic>
 
-#include "yasio/config.hpp"
-
 namespace yasio
 {
 template <typename _Ty, bool delay = false>
@@ -94,7 +92,7 @@ private:
     std::mem_fn(memf)(inst);
   }
 
-  static void delay_init(_Ty* inst)
+  static void delay_init(_Ty* /*inst*/)
   { // dummy init without delay init member func, same as no delay constructor
   }
 };

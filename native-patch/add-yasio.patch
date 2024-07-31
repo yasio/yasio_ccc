@@ -1,0 +1,39 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 947dcbc559..d4fb18088c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2865,6 +2865,20 @@ cocos_source_files(
+ 
+ list(APPEND COCOS_SOURCE_LIST ${CC_EXTERNAL_SOURCES})
+ 
++# BEGIN yasio
++# set(YASIO_HEADER_ONLY TRUE CACHE BOOL "" FORCE)
++# set(YASIO_ENABLE_KCP TRUE CACHE BOOL "" FORCE)
++# set(YASIO_OBS_BUILTIN_STACK TRUE CACHE BOOL "" FORCE)
++cocos_source_files(
++  yasio/yasio/bindings/yasio_jsb20.cpp
++  yasio/yasio/bindings/yasio_jsb20.hpp
++  yasio/kcp/ikcp.c)
++if (MSVC_IDE)
++    cocos_source_files(yasio/yasio/yasio.natvis)
++endif()
++list(APPEND CC_EXTERNAL_INCLUDES ${CWD}/yasio)
++# END yasio
++
+ ### generate source files
+ 
+ set(COCOS_DEBUGINFO_SRC
+diff --git a/cocos/bindings/manual/jsb_module_register.cpp b/cocos/bindings/manual/jsb_module_register.cpp
+index 6ca0b06713..e1372bc03c 100644
+--- a/cocos/bindings/manual/jsb_module_register.cpp
++++ b/cocos/bindings/manual/jsb_module_register.cpp
+@@ -201,6 +201,9 @@ bool jsb_register_all_modules() {
+     se->addRegisterCallback(register_all_physics);
+ #endif
+ 
++    extern bool jsb_register_yasio(se::Object * obj);
++    se->addRegisterCallback(jsb_register_yasio);
++
+ #if CC_USE_AR_MODULE
+     se->addRegisterCallback(register_all_ar);
+     se->addRegisterCallback(register_all_ar_manual);

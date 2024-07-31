@@ -1,7 +1,8 @@
-# yasio-creator-test
+# yasio-ccc - yasio for cocos creator native
 
-- cocos creator version: 3.7.3
-- yasio version: 4.1.0
+- yasio version: 4.2.4
+- cocos creator version: 3.8.2
+
 
 usage: 
 

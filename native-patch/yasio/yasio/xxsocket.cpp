@@ -5,7 +5,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2012-2023 HALX99
+Copyright (c) 2012-2024 HALX99
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -76,12 +76,14 @@ namespace compat
 } // namespace yasio
 #endif
 
+#define YASIO_NO_ERROR "No error."
+#define YASIO_NO_ERROR_SZ (sizeof(YASIO_NO_ERROR))
+
 namespace yasio
 {
 YASIO__NS_INLINE
 namespace inet
 {
-
 int xxsocket::xpconnect(const char* hostname, u_short port, u_short local_port)
 {
   auto flags = getipsv();
@@ -126,8 +128,7 @@ int xxsocket::xpconnect_n(const char* hostname, u_short port, const std::chrono:
             else if (flags & ipsv_ipv6)
             {
               xxsocket::resolve_i([&](const addrinfo* ai6) { return 0 == (error = pconnect_n(ip::endpoint{ai6}, wtimeout, local_port)); }, hostname, port,
-                                  AF_INET6,
-                                  AI_V4MAPPED);
+                                  AF_INET6, AI_V4MAPPED);
             }
             break;
           case AF_INET6:
@@ -229,7 +230,8 @@ bool xxsocket::popen(int af, int type, int protocol)
   return ok;
 }
 
-int xxsocket::paccept(socket_native_type& new_sock) {
+int xxsocket::paccept(socket_native_type& new_sock)
+{
   for (;;)
   {
     // Accept the waiting connection.
@@ -976,28 +978,37 @@ bool xxsocket::not_recv_error(int error) { return (error == EWOULDBLOCK || error
 
 const char* xxsocket::strerror(int error)
 {
+  if (error != 0)
+  {
 #if defined(_WIN32)
-  static char error_msg[256];
-  return xxsocket::strerror_r(error, error_msg, sizeof(error_msg));
+    static char error_msg[256];
+    return xxsocket::strerror_r(error, error_msg, sizeof(error_msg));
 #else
-  return ::strerror(error);
+    return ::strerror(error);
 #endif
+  }
+  return YASIO_NO_ERROR;
 }
 
 const char* xxsocket::strerror_r(int error, char* buf, size_t buflen)
 {
+  if (error != 0)
+  {
 #if defined(_WIN32)
-  ZeroMemory(buf, buflen);
-  ::FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK /* remove line-end charactors \r\n */, NULL,
-                   error, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), // english language
-                   buf, static_cast<DWORD>(buflen), nullptr);
+    ZeroMemory(buf, buflen);
+    ::FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_MAX_WIDTH_MASK /* remove line-end charactors \r\n */, NULL,
+                     error, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), // english language
+                     buf, static_cast<DWORD>(buflen), nullptr);
 
-  return buf;
+    return buf;
 #else
-  // XSI-compliant return int not const char*, refer to: https://linux.die.net/man/3/strerror_r
-  auto YASIO__UNUSED ret = ::strerror_r(error, buf, buflen);
-  return buf;
+    // XSI-compliant return int not const char*, refer to: https://linux.die.net/man/3/strerror_r
+    auto YASIO__UNUSED ret = ::strerror_r(error, buf, buflen);
+    return buf;
 #endif
+  }
+  strncpy(buf, YASIO_NO_ERROR, (std::min)(YASIO_NO_ERROR_SZ, buflen));
+  return buf;
 }
 
 const char* xxsocket::gai_strerror(int error)
@@ -1024,7 +1035,11 @@ struct ws2_32_gc {
   ~ws2_32_gc(void) { WSACleanup(); }
 };
 
+#  pragma warning(push)
+#  pragma warning(disable : 4073)
+#  pragma init_seg(lib)
 ws2_32_gc __ws32_lib_gc;
+#  pragma warning(pop)
 } // namespace
 #endif
 

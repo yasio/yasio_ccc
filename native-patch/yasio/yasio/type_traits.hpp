@@ -25,31 +25,37 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#ifndef YASIO__LOGGING_HPP
-#define YASIO__LOGGING_HPP
-#include "yasio/strfmt.hpp"
 
-#if defined(__EMSCRIPTEN__)
-#  include <stdio.h>
-#  include <unistd.h>
-inline void yasio__print(std::string&& message) { ::write(::fileno(stdout), message.c_str(), message.size()); }
-#  define YASIO_LOG_TAG(tag, format, ...) yasio__print(::yasio::strfmt(127, (tag format), ##__VA_ARGS__))
-#elif defined(_WIN32)
-#  define YASIO_LOG_TAG(tag, format, ...) OutputDebugStringA(::yasio::strfmt(127, (tag format "\n"), ##__VA_ARGS__).c_str())
-#elif defined(ANDROID) || defined(__ANDROID__)
-#  include <android/log.h>
-#  include <jni.h>
-#  define YASIO_LOG_TAG(tag, format, ...) __android_log_print(ANDROID_LOG_INFO, "yasio", (tag format), ##__VA_ARGS__)
-#else
-#  define YASIO_LOG_TAG(tag, format, ...) printf((tag format "\n"), ##__VA_ARGS__)
-#endif
+#pragma once
 
-#define YASIO_LOG(format, ...) YASIO_LOG_TAG("[yasio]", format, ##__VA_ARGS__)
+#include <cstddef>
+#include <type_traits>
+#include "yasio/sz.hpp"
 
-#if !defined(YASIO_VERBOSE_LOG)
-#  define YASIO_LOGV(fmt, ...) (void)0
-#else
-#  define YASIO_LOGV YASIO_LOG
-#endif
+namespace yasio
+{
+template <typename _Ty>
+struct aligned_storage_size {
+  static const size_t value = YASIO_SZ_ALIGN(sizeof(_Ty), sizeof(std::max_align_t));
+};
+template <typename _Ty>
+struct is_aligned_storage {
+  static const bool value = aligned_storage_size<_Ty>::value == sizeof(_Ty);
+};
+template <class _Iter>
+struct is_iterator : public std::integral_constant<bool, !std::is_integral<_Iter>::value> {};
 
-#endif
+template <bool _Test, class _Ty = void>
+using enable_if_t = typename ::std::enable_if<_Test, _Ty>::type;
+
+template <typename _Ty>
+struct is_byte_type {
+  static const bool value = std::is_same<_Ty, char>::value || std::is_same<_Ty, unsigned char>::value;
+};
+
+template <typename _Ty>
+struct is_char_type {
+  static const bool value = std::is_integral<_Ty>::value && sizeof(_Ty) <= sizeof(char32_t);
+};
+
+} // namespace yasio

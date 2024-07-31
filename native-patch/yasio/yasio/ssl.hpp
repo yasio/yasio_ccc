@@ -5,7 +5,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2012-2023 HALX99
+Copyright (c) 2012-2024 HALX99
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -97,50 +97,6 @@ YASIO__DECL int yssl_read(yssl_st* ssl, void* data, size_t len, int& err);
 
 #define yasio__valid_str(cstr) (cstr && *cstr)
 #define yasio__c_str(str) (!str.empty() ? &str.front() : nullptr)
-
-/* private use for split cert files */
-template <typename _Fty>
-inline bool yssl_splitpath(char* str, _Fty&& func)
-{
-  auto _Start  = str; // the start of every string
-  auto _Ptr    = str; // source string iterator
-  bool aborted = false;
-  while ((_Ptr = strchr(_Ptr, ',')))
-  {
-    if (_Start <= _Ptr)
-    {
-      if ((aborted = func(_Start, _Ptr)))
-        break;
-    }
-    _Start = _Ptr + 1;
-    ++_Ptr;
-  }
-
-  if (!aborted)
-    aborted = func(_Start, nullptr); // last one
-  return aborted;
-}
-
-struct yssl_split_term {
-  yssl_split_term(char* end)
-  {
-    if (end)
-    {
-      this->val_ = *end;
-      *end       = '\0';
-      this->end_ = end;
-    }
-  }
-  ~yssl_split_term()
-  {
-    if (this->end_)
-      *this->end_ = this->val_;
-  }
-
-private:
-  char* end_ = nullptr;
-  char val_  = '\0';
-};
 
 #if YASIO_SSL_BACKEND == 1 // openssl
 #  include "yasio/impl/openssl.hpp"
